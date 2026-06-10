@@ -84,7 +84,7 @@ for (; frames < MAX; frames++) {
   render(); // 描画コードも全フレーム実行して例外がないことを確認
   if (game.dialog && game.dialog.text !== lastDialog) {
     lastDialog = game.dialog.text;
-    dialogs.push(lastDialog);
+    dialogs.push({ n: game.dialog.name || '', t: lastDialog });
   }
   if (game.mode === 'fin') break;
 }
@@ -101,15 +101,17 @@ if (game.mode !== 'fin') { console.error('NG: 最後まで到達できません�
 if (missing.length) { console.error('NG: 未到達シーン:', missing); fail = true; }
 if (inputCount !== 1) { console.error('NG: 名前入力は1回のはず:', inputCount); fail = true; }
 
-// 名前差し込みの検証
-const joined = dialogs.join('\n');
+// 名前差し込みと呼称の検証
+const joined = dialogs.map(d => d.t).join('\n');
 if (!joined.includes('やや花ちゃん')) { console.error('NG: 大国主が本名を呼んでいません'); fail = true; }
 if (!joined.includes('ただいま')) { console.error('NG: ラストの「ただいま」が見つかりません'); fail = true; }
 if (!joined.includes('呼ばせてもらうぞ、ななし')) { console.error('NG: ななし呼びの導入が見つかりません'); fail = true; }
 // 幽世は「ななし」、大国主は「ななしちゃん」と呼ぶ
-const kakuriyoChan = dialogs.filter(t => t.includes('ななしちゃん') && !t.includes('僕') && t.startsWith('「') && !t.includes('ね、ななしちゃん') && !t.includes('夢のなかの君'));
+const kakuriyoChan = dialogs.filter(d => d.n === '幽世' && d.t.includes('ななしちゃん'));
 if (kakuriyoChan.length) { console.error('NG: 幽世が「ななしちゃん」と呼んでいます:', kakuriyoChan); fail = true; }
-if (!joined.includes('ね、ななしちゃん')) { console.error('NG: 大国主が「ななしちゃん」と呼んでいません'); fail = true; }
+if (!dialogs.some(d => d.n === '大国主' && d.t.includes('ななしちゃん'))) { console.error('NG: 大国主が「ななしちゃん」と呼んでいません'); fail = true; }
+if (!joined.includes('愛がある暴力は、暴力じゃない')) { console.error('NG: 必須の台詞「愛がある暴力は暴力じゃない」が見つかりません'); fail = true; }
+if (!joined.includes('愛があってもなくても、暴力は暴力だ')) { console.error('NG: 大国主の否定の台詞が見つかりません'); fail = true; }
 
 if (fail) process.exit(1);
 console.log('OK: タイトル後〜「了」まで通しで完走しました');
