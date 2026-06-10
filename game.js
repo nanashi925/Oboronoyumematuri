@@ -332,16 +332,27 @@ const Snd = {
     if (!name) return;
     if (!this.ensure()) return;
     const p = this.patterns[name];
-    this.bgmStep = 0;
-    const beat = 60000 / p.bpm / 2; // 8分音符
-    this.bgmTimer = setInterval(() => {
+    const beat = 60 / p.bpm / 2; // 8分音符（秒）
+    let step = 0;
+    let nextT = this.ac.currentTime + 0.05;
+    // AudioContext の時計を基準に約1.6秒先まで予約しておくことで、
+    // バックグラウンドでタイマーが間引かれても音が途切れない
+    const tick = () => {
       if (this.bgmName !== name || !this.ac) return;
-      const i = this.bgmStep++;
-      const n = p.seq[i % p.seq.length];
-      if (n != null) this.tone(n, beat / 1000 * 1.8, p.wave, p.vol);
-      const b = p.bass[Math.floor(i / 2) % p.bass.length];
-      if (b != null && i % 2 === 0) this.tone(b, beat / 1000 * 3, 'triangle', 0.08);
-    }, beat);
+      const horizon = this.ac.currentTime + 1.6;
+      if (nextT < this.ac.currentTime - 0.5) nextT = this.ac.currentTime + 0.05; // 大きく停止した後の追いつき
+      while (nextT < horizon) {
+        const i = step++;
+        const when = Math.max(0, nextT - this.ac.currentTime);
+        const n = p.seq[i % p.seq.length];
+        if (n != null) this.tone(n, beat * 1.8, p.wave, p.vol, when);
+        const b = p.bass[Math.floor(i / 2) % p.bass.length];
+        if (b != null && i % 2 === 0) this.tone(b, beat * 3, 'triangle', 0.08, when);
+        nextT += beat;
+      }
+    };
+    tick();
+    this.bgmTimer = setInterval(tick, 300);
   },
 };
 
@@ -370,6 +381,11 @@ function bindInput(cv) {
   });
   // フォーカスを失ったら移動キーを離した扱いにする
   addEventListener('blur', () => { Key.left = false; Key.right = false; });
+  // タブ復帰時にオーディオを再開する
+  const resumeAudio = () => { if (Snd.ac && Snd.ac.state === 'suspended') Snd.ac.resume(); };
+  document.addEventListener('visibilitychange', resumeAudio);
+  addEventListener('focus', resumeAudio);
+  addEventListener('pageshow', resumeAudio);
 
   // 画面のどこをタップ／クリックしても「すすむ」。選択肢は直接タップでも選べる。
   const canvasPos = (cx, cy) => {
@@ -545,7 +561,7 @@ function execCmd(cmd) {
     case 'shake': { game.shakeT = cmd.t || 30; game.shakeMag = cmd.mag || 4; return null; }
     case 'memory': {
       game.memory = { lines: cmd.lines.map(fmt), idx: 0, shown: 0 };
-      Snd.bgm(null); Snd.sfx('heart');
+      Snd.sfx('heart'); // BGMは止めない（回想中も鳴らし続ける）
       return { type: 'memory' };
     }
     case 'choice': {
@@ -561,7 +577,7 @@ function execCmd(cmd) {
       return { type: 'chase' };
     }
     case 'bossfx': Object.assign(game.bossFx, cmd.set); return null;
-    case 'fin': { game.mode = 'fin'; game.finT = 0; return { type: 'forever' }; }
+    case 'fin': { game.mode = 'fin'; game.finT = 0; Snd.bgm('dream'); return { type: 'forever' }; }
   }
   return null;
 }
