@@ -368,34 +368,63 @@ function bindInput(cv) {
     if (['ArrowUp', 'w', 'W'].includes(e.key)) Key.up = false;
     if (['ArrowDown', 's', 'S'].includes(e.key)) Key.down = false;
   });
-  // タッチ／クリック：左右1/4で移動、中央で決定
-  const pos = ev => {
+  // フォーカスを失ったら移動キーを離した扱いにする
+  addEventListener('blur', () => { Key.left = false; Key.right = false; });
+
+  // 画面のどこをタップ／クリックしても「すすむ」。選択肢は直接タップでも選べる。
+  const canvasPos = (cx, cy) => {
     const r = cv.getBoundingClientRect();
-    const p = ev.touches ? ev.touches[0] : ev;
-    return { x: (p.clientX - r.left) / r.width * W, y: (p.clientY - r.top) / r.height * H };
+    return { x: (cx - r.left) / r.width * W, y: (cy - r.top) / r.height * H };
   };
-  let touchMove = null;
-  const press = ev => {
-    Snd.ensure();
+  const tapAdvance = (cx, cy) => {
     if (game.inputOpen) return;
-    const p = pos(ev);
-    if (game.choice) { pickChoiceAt(p); ev.preventDefault(); return; }
-    if ((game.control || game.chase) && !game.dialog) {
-      if (p.x < W * 0.28) { Key.left = true; touchMove = 'L'; }
-      else if (p.x > W * 0.72) { Key.right = true; touchMove = 'R'; }
-      else advQueue++;
-    } else advQueue++;
-    ev.preventDefault();
+    Snd.ensure();
+    if (game.choice) {
+      const p = canvasPos(cx, cy);
+      if (p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H) { pickChoiceAt(p); return; }
+    }
+    advQueue++;
   };
-  const release = () => {
-    if (touchMove === 'L') Key.left = false;
-    if (touchMove === 'R') Key.right = false;
-    touchMove = null;
+  const skipTarget = e => e.target && e.target.closest && e.target.closest('.tbtn, #nameOverlay');
+  document.addEventListener('mousedown', e => {
+    if (skipTarget(e)) return;
+    tapAdvance(e.clientX, e.clientY);
+  });
+  document.addEventListener('touchstart', e => {
+    if (skipTarget(e)) return;
+    tapAdvance(e.touches[0].clientX, e.touches[0].clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  // スマホ用ボタン（◀ ▶ ✦）：押している間だけ移動
+  const hold = (id, on, off) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const start = e => {
+      Snd.ensure();
+      if (!game.inputOpen) on();
+      e.preventDefault(); e.stopPropagation();
+    };
+    const end = e => {
+      if (off) off();
+      if (e && e.preventDefault) e.preventDefault();
+    };
+    el.addEventListener('touchstart', start, { passive: false });
+    el.addEventListener('touchend', end, { passive: false });
+    el.addEventListener('touchcancel', end, { passive: false });
+    el.addEventListener('mousedown', start);
+    el.addEventListener('mouseup', end);
+    el.addEventListener('mouseleave', () => { if (off) off(); });
   };
-  cv.addEventListener('mousedown', press);
-  cv.addEventListener('mouseup', release);
-  cv.addEventListener('touchstart', press, { passive: false });
-  cv.addEventListener('touchend', e => { release(); e.preventDefault(); }, { passive: false });
+  hold('padL', () => { Key.left = true; }, () => { Key.left = false; });
+  hold('padR', () => { Key.right = true; }, () => { Key.right = false; });
+  hold('btnA', () => { advQueue++; }, null);
+
+  // タッチ端末ではメディアクエリに関係なくボタンを表示する
+  if (typeof navigator !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+    const ui = document.getElementById('touchUI');
+    if (ui) ui.style.display = 'block';
+  }
 }
 
 /* ---------------------------------------------------------
@@ -528,7 +557,7 @@ function execCmd(cmd) {
       actor('player', { x: 160, visible: true, flip: false });
       actor('mother', { x: 10, visible: true, sprite: 'mother', flip: false });
       game.control = false;
-      game.hint = '→キー（画面右タッチ）で にげろ！';
+      game.hint = '→キー／▶ボタン おしっぱなしで にげろ！';
       return { type: 'chase' };
     }
     case 'bossfx': Object.assign(game.bossFx, cmd.set); return null;
@@ -727,7 +756,7 @@ function buildScript() {
     { c: 'say', t: '（よる。提灯。桜のはなびら。——しらない町）' },
     { c: 'say', t: '（だれも、いない）' },
     { c: 'say', t: '（…………よかった）' },
-    { c: 'free', until: 480, hint: '←→キー（画面はしタッチ）で あるく' },
+    { c: 'free', until: 480, hint: '←→キー／◀▶ボタンで あるく' },
     { c: 'say', t: '（お祭り、みたいなのに。屋台にも、だれもいない）' },
     { c: 'say', t: '（しずかで、やさしい夜。ずっとこんな場所を、さがしてた気がする）' },
     { c: 'free', until: 760 },

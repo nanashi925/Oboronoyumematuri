@@ -71,10 +71,40 @@
   }
   #nameBtn:hover { background: #3a2c6a; }
   #nameNote { color: #6a6488; font-size: 12px; margin-top: 12px; }
+  /* スマホ用タッチコントロール */
+  #touchUI { display: none; }
+  @media (pointer: coarse) { #touchUI { display: block; } }
+  .tbtn {
+    position: fixed;
+    bottom: 16px;
+    width: 64px; height: 64px;
+    line-height: 64px;
+    border-radius: 50%;
+    background: rgba(40, 30, 70, 0.55);
+    border: 2px solid rgba(159, 134, 216, 0.7);
+    color: #e8e2f0;
+    font-size: 26px;
+    text-align: center;
+    z-index: 5;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+  }
+  .tbtn:active { background: rgba(94, 64, 144, 0.75); }
+  #padL { left: 14px; }
+  #padR { left: 92px; }
+  #btnA { right: 14px; font-size: 22px; }
 </style>
 </head>
 <body>
   <canvas id="screen"></canvas>
+
+  <div id="touchUI">
+    <div class="tbtn" id="padL">◀</div>
+    <div class="tbtn" id="padR">▶</div>
+    <div class="tbtn" id="btnA">✦</div>
+  </div>
 
   <div id="nameOverlay">
     <div id="nameBox">
